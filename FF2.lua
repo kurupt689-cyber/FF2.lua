@@ -1,369 +1,326 @@
---[[
-    Star Hub Menu (Football Fusion 2 Edition)
-    Features:
-    - Toggle Menu (B key + top-right button)
-    - Categories: Catching (Page 1 & 2), Visuals, Risky, Remote, Contributors, About
-    - Magnet Catch with Adjustable Range & Pull Vector
-    - FireTouchInterest Auto Catch (50ms spam)
-    - Angle Enhancer Toggle
-    - Freeze Tech (Toggle + adjustable seconds)
-    - Ball ESP, Path Visualizer, Glow, Aura, Box Ball
-    - Blue Round around your character
-    - Risky Features: Speed Boost, Fly, TP to Ball, Mega Jump, Invisible Body
-    - Remote Features: Auto Catch Distance Slider, Magnet Pull Vector Slider, Box Ball Size Slider
-    - Rainbow contributor text
-    - Blood dark red + black theme
-    - Draggable GUI top-left corner
-]]
-
+-- Star Hub Menu - Massive Green Halo + Overpower Magnet
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
 local workspace = game:GetService("Workspace")
 
-local player = Players.LocalPlayer
-local guiToggled = true
-
-local settingsKey = "FF2_Settings"
+-- Settings
 local settings = {
-    -- Catching Page 1
     magnet = true,
+    overpowerMagnet = false,
     autoCatch = true,
     angle = true,
     freezeTech = false,
     freezeTime = 2,
-    -- Catching Page 2
-    catchBoost = false,
-    stickyHands = false,
-    superMagnet = false,
-    magnetPullVector = 5,
-    range = 20,
-    -- Visuals
     esp = true,
     path = true,
-    glowTrail = true,
-    ballAura = true,
-    ballShadow = true,
-    blueRound = false,
-    boxBall = false,
-    boxBallSize = 5,
-    -- Risky
-    speedBoost = false,
-    fly = false,
-    tpBall = false,
-    megaJump = false,
-    invisibleBody = false,
-    ballDistanceVisual = false,
-    ballTrackerLine = false,
-    -- Remote
-    autoCatchDistance = 20
+    range = 20,
+    catchLeft = true,
+    catchRight = true,
+    superKick=false,
+    speedBoost=false,
+    autoScore=false,
+    instantPass=false,
+    autoBlock=false,
+    fastRespawn=false,
+    greenHalo=true
 }
 
-pcall(function()
-    local stored = HttpService:JSONDecode(readfile(settingsKey))
-    for k,v in pairs(stored) do settings[k] = v end
-end)
-
-local function saveSettings()
-    pcall(function()
-        writefile(settingsKey, HttpService:JSONEncode(settings))
-    end)
-end
-
--- GUI Setup
+-- GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "StarHub_GUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = game.CoreGui
 
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0,400,0,400)
-mainFrame.Position = UDim2.new(0,50,0,50)
-mainFrame.BackgroundColor3 = Color3.fromRGB(60,0,0)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Name = "MainMenu"
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 350)
+frame.Position = UDim2.new(0.5, -150, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
 
--- Category Buttons Frame
-local catFrame = Instance.new("Frame", mainFrame)
-catFrame.Size = UDim2.new(1,0,0,35)
-catFrame.Position = UDim2.new(0,0,0,0)
-catFrame.BackgroundTransparency = 1
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "★ Star Hub ★"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = frame
 
-local categories = {"Catching","Visuals","Risky","Remote","Contributors","About"}
-local catContent = {}
-local contentFrame = Instance.new("Frame", mainFrame)
-contentFrame.Size = UDim2.new(1,-10,1,-45)
-contentFrame.Position = UDim2.new(0,5,0,40)
-contentFrame.BackgroundTransparency = 1
-local yOffset = 10
+-- Scrolling frame
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1,0,1,-30)
+scrollingFrame.Position = UDim2.new(0,0,0,30)
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.CanvasSize = UDim2.new(0,0,0,0)
+scrollingFrame.Parent = frame
 
-local function clearContent()
-    for _,v in pairs(contentFrame:GetChildren()) do v:Destroy() end
-    yOffset = 10
-end
+local scrollLayout = Instance.new("UIListLayout")
+scrollLayout.FillDirection = Enum.FillDirection.Vertical
+scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+scrollLayout.Padding = UDim.new(0,5)
+scrollLayout.Parent = scrollingFrame
 
-local function createToggle(parent, name, settingKey)
-    local default = settings[settingKey]
-    local button = Instance.new("TextButton", parent)
-    button.Size = UDim2.new(1,-10,0,30)
-    button.Position = UDim2.new(0,5,0,yOffset)
-    button.Text = name..": "..(default and "ON" or "OFF")
-    button.BackgroundColor3 = Color3.fromRGB(25,0,0)
-    button.TextColor3 = Color3.new(1,1,1)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 16
-    button.MouseButton1Click:Connect(function()
-        default = not default
-        button.Text = name..": "..(default and "ON" or "OFF")
-        settings[settingKey] = default
-        saveSettings()
+-- Categories
+local categories = {"Catching","Visuals","Sliders","Automatics"}
+local categoryFrames = {}
+
+local categoryScripts = {
+    Catching = {"Magnet","Overpower Magnet","Auto Catch","Angle Enhancer","Freeze Tech","Catch Left Hand","Catch Right Hand"},
+    Visuals = {"Ball ESP","Ball Path","Massive Green Halo"},
+    Sliders = {"Magnet Range","Freeze Time"},
+    Automatics = {"Super Kick","Speed Boost","Auto Score","Instant Pass","Auto Block","Fast Respawn"}
+}
+
+-- Helpers
+local function createToggleButton(parent,name,callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1,-10,0,30)
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.Text = name..": OFF"
+    btn.Parent = parent
+    local active=false
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        btn.Text = name..": "..(active and "ON" or "OFF")
+        callback(active)
     end)
-    yOffset = yOffset + 35
 end
 
-local function createSliderBox(parent, name, settingKey, minVal, maxVal)
-    local initialValue = settings[settingKey]
-    local box = Instance.new("TextBox", parent)
-    box.Position = UDim2.new(0,5,0,yOffset)
+local function createSlider(parent,name,min,max,default,callback)
+    local box = Instance.new("TextBox")
     box.Size = UDim2.new(1,-10,0,30)
-    box.Text = name..": "..tostring(initialValue)
-    box.BackgroundColor3 = Color3.fromRGB(15,0,0)
+    box.BackgroundColor3 = Color3.fromRGB(60,60,60)
     box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
+    box.Text = name..": "..default
     box.ClearTextOnFocus = true
-    box.Font = Enum.Font.GothamBold
-    box.TextSize = 16
+    box.Parent = parent
     box.FocusLost:Connect(function()
         local val = tonumber(box.Text:match("%d+"))
-        if val then val = math.clamp(val,minVal,maxVal); box.Text = name..": "..val; settings[settingKey]=val; saveSettings()
-        else box.Text = name..": "..tostring(initialValue) end
+        if val then
+            val = math.clamp(val,min,max)
+            box.Text=name..": "..val
+            callback(val)
+        else
+            box.Text=name..": "..default
+        end
     end)
-    yOffset = yOffset + 35
 end
 
--- Page switcher for Catching
-local catchingPage = 1
-local function catchingPages()
-    clearContent()
-    local pageBtn = Instance.new("TextButton", contentFrame)
-    pageBtn.Size = UDim2.new(0,150,0,30)
-    pageBtn.Position = UDim2.new(0,5,0,yOffset)
-    pageBtn.Text = "Switch Page"
-    pageBtn.BackgroundColor3 = Color3.fromRGB(40,0,0)
-    pageBtn.TextColor3 = Color3.new(1,1,1)
-    pageBtn.Font = Enum.Font.GothamBold
-    pageBtn.TextSize = 16
-    pageBtn.MouseButton1Click:Connect(function()
-        catchingPage = catchingPage == 1 and 2 or 1
-        catchingPages()
-    end)
-    yOffset = yOffset + 40
+-- Create categories
+for _,catName in ipairs(categories) do
+    local catBtn = Instance.new("TextButton")
+    catBtn.Size = UDim2.new(1,-20,0,30)
+    catBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    catBtn.TextColor3 = Color3.new(1,1,1)
+    catBtn.Font = Enum.Font.GothamBold
+    catBtn.TextSize = 16
+    catBtn.Text = catName.." ▼"
+    catBtn.Parent = scrollingFrame
 
-    if catchingPage == 1 then
-        createToggle(contentFrame,"Magnet","magnet")
-        createToggle(contentFrame,"Auto Catch","autoCatch")
-        createToggle(contentFrame,"Angle Enhancer","angle")
-        createToggle(contentFrame,"Freeze Tech","freezeTech")
-        createSliderBox(contentFrame,"Magnet Range","range",5,80)
-        createSliderBox(contentFrame,"Freeze Time (s)","freezeTime",1,5)
-    else
-        createToggle(contentFrame,"Catch Boost","catchBoost")
-        createToggle(contentFrame,"Sticky Hands","stickyHands")
-        createToggle(contentFrame,"Super Magnet","superMagnet")
-        createSliderBox(contentFrame,"Magnet Pull Vector","magnetPullVector",1,20)
+    local catFrame = Instance.new("Frame")
+    catFrame.Size = UDim2.new(1,-20,0,0)
+    catFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    catFrame.BorderSizePixel = 0
+    catFrame.ClipsDescendants = true
+    catFrame.Parent = scrollingFrame
+
+    local layout = Instance.new("UIListLayout")
+    layout.FillDirection = Enum.FillDirection.Vertical
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0,5)
+    layout.Parent = catFrame
+
+    categoryFrames[catName] = {button=catBtn,frame=catFrame,open=false}
+
+    catBtn.MouseButton1Click:Connect(function()
+        for name,cat in pairs(categoryFrames) do
+            if name==catName then
+                cat.open = not cat.open
+                cat.button.Text = name..(cat.open and " ▲" or " ▼")
+                local count = #categoryScripts[name]
+                cat.frame.Size = UDim2.new(1,-20,0,cat.open and count*35 + 10 or 0)
+            else
+                cat.open=false
+                cat.button.Text=name.." ▼"
+                cat.frame.Size=UDim2.new(1,-20,0,0)
+            end
+        end
+        scrollingFrame.CanvasSize = UDim2.new(0,0,0,scrollLayout.AbsoluteContentSize.Y)
+    end)
+
+    for _,scriptName in ipairs(categoryScripts[catName]) do
+        if catName=="Sliders" then
+            if scriptName=="Magnet Range" then
+                createSlider(catFrame,scriptName,5,80,settings.range,function(val) settings.range=val end)
+            elseif scriptName=="Freeze Time" then
+                createSlider(catFrame,scriptName,1,5,settings.freezeTime,function(val) settings.freezeTime=val end)
+            end
+        else
+            createToggleButton(catFrame,scriptName,function(active)
+                if catName=="Catching" then
+                    if scriptName=="Magnet" then settings.magnet=active
+                    elseif scriptName=="Overpower Magnet" then settings.overpowerMagnet=active
+                    elseif scriptName=="Auto Catch" then settings.autoCatch=active
+                    elseif scriptName=="Angle Enhancer" then settings.angle=active
+                    elseif scriptName=="Freeze Tech" then settings.freezeTech=active
+                    elseif scriptName=="Catch Left Hand" then settings.catchLeft=active
+                    elseif scriptName=="Catch Right Hand" then settings.catchRight=active
+                    end
+                elseif catName=="Visuals" then
+                    if scriptName=="Ball ESP" then settings.esp=active
+                    elseif scriptName=="Ball Path" then settings.path=active
+                    elseif scriptName=="Massive Green Halo" then settings.greenHalo=active
+                    end
+                elseif catName=="Automatics" then
+                    if scriptName=="Super Kick" then settings.superKick=active
+                    elseif scriptName=="Speed Boost" then settings.speedBoost=active
+                    elseif scriptName=="Auto Score" then settings.autoScore=active
+                    elseif scriptName=="Instant Pass" then settings.instantPass=active
+                    elseif scriptName=="Auto Block" then settings.autoBlock=active
+                    elseif scriptName=="Fast Respawn" then settings.fastRespawn=active
+                    end
+                end
+            end)
+        end
     end
 end
 
--- Visuals
-catContent["Visuals"] = function()
-    clearContent()
-    createToggle(contentFrame,"Ball ESP","esp")
-    createToggle(contentFrame,"Glow Trail","glowTrail")
-    createToggle(contentFrame,"Path Visualizer","path")
-    createToggle(contentFrame,"Ball Aura","ballAura")
-    createToggle(contentFrame,"Ball Shadow","ballShadow")
-    createToggle(contentFrame,"Blue Round","blueRound")
-    createToggle(contentFrame,"Box Ball","boxBall")
-end
+-- Catching & Magnet / Overpower Magnet
+RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local ball = workspace:FindFirstChild("Football")
+    if not ball then return end
+    local root = char.HumanoidRootPart
+    local dist = (ball.Position - root.Position).Magnitude
 
--- Risky
-catContent["Risky"] = function()
-    clearContent()
-    createToggle(contentFrame,"Speed Boost","speedBoost")
-    createToggle(contentFrame,"Fly","fly")
-    createToggle(contentFrame,"TP to Ball","tpBall")
-    createToggle(contentFrame,"Mega Jump","megaJump")
-    createToggle(contentFrame,"Invisible Body","invisibleBody")
-    createToggle(contentFrame,"Ball Distance Visual","ballDistanceVisual")
-    createToggle(contentFrame,"Ball Tracker Line","ballTrackerLine")
-end
-
--- Remote
-catContent["Remote"] = function()
-    clearContent()
-    createSliderBox(contentFrame,"Auto Catch Distance","autoCatchDistance",5,80)
-    createSliderBox(contentFrame,"Magnet Pull Vector","magnetPullVector",1,20)
-    createSliderBox(contentFrame,"Box Ball Size","boxBallSize",1,20)
-end
-
--- Contributors
-catContent["Contributors"] = function()
-    clearContent()
-    local label = Instance.new("TextLabel", contentFrame)
-    label.Size = UDim2.new(1,0,0,50)
-    label.Position = UDim2.new(0,0,0,10)
-    label.Text = "Owner: Kurupt"
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 30
-    label.TextColor3 = Color3.fromRGB(255,0,0)
-    label.BackgroundTransparency = 1
-end
-
--- About
-catContent["About"] = function()
-    clearContent()
-    local label = Instance.new("TextLabel", contentFrame)
-    label.Size = UDim2.new(1,0,0,100)
-    label.Position = UDim2.new(0,0,0,10)
-    label.TextWrapped = true
-    label.Text = "Welcome to Star Hub, best FF2 script with Magnet, Auto Catch, ESP, Box Ball, Risky, and Remote features."
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 16
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.BackgroundTransparency = 1
-end
-
--- Category Buttons
-local buttonX = 0
-for i,catName in pairs(categories) do
-    local btn = Instance.new("TextButton", catFrame)
-    btn.Size = UDim2.new(0,65,1,0)
-    btn.Position = UDim2.new(0,buttonX,0,0)
-    btn.Text = catName
-    btn.BackgroundColor3 = Color3.fromRGB(60,0,0)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.MouseButton1Click:Connect(function()
-        if catName=="Catching" then catchingPages()
-        else catContent[catName]() end
-    end)
-    buttonX = buttonX + 65
-end
-
--- Default to Catching Page 1
-catchingPages()
-
--- GUI Toggle Key
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==Enum.KeyCode.B then
-        guiToggled = not guiToggled
-        mainFrame.Visible = guiToggled
+    -- Normal Magnet
+    if settings.magnet and dist <= settings.range then
+        root.CFrame = CFrame.new(ball.Position)
     end
-end)
 
--- Toggle Button
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Name = "ToggleMenuButton"
-toggleBtn.Text = "Star Hub"
-toggleBtn.Size = UDim2.new(0,100,0,30)
-toggleBtn.Position = UDim2.new(1,-110,0,5)
-toggleBtn.AnchorPoint = Vector2.new(0,0)
-toggleBtn.Parent = screenGui
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0,0,0)
-toggleBtn.TextColor3 = Color3.new(1,1,1)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 14
-toggleBtn.MouseButton1Click:Connect(function()
-    guiToggled = not guiToggled
-    mainFrame.Visible = guiToggled
-end)
+    -- Overpower Magnet (crazy magnet)
+    if settings.overpowerMagnet then
+        local allBalls = workspace:GetChildren()
+        for _,b in pairs(allBalls) do
+            if b:IsA("BasePart") and b.Name=="Football" then
+                b.Position = b.Position:Lerp(root.Position,0.2) -- crazy fast attraction
+            end
+        end
+    end
 
--- Auto Catch + Magnet
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if not settings.autoCatch then continue end
-
-        local ball = workspace:FindFirstChild("Football")
-        local char = player.Character
-        if not (ball and char and char:FindFirstChild("HumanoidRootPart")) then continue end
-
-        local dist = (ball.Position - char.HumanoidRootPart.Position).Magnitude
-        if dist <= settings.range then
-            for _, handName in {"CatchLeft","CatchRight"} do
+    -- Auto Catch + Freeze Tech
+    if settings.autoCatch and dist <= settings.range then
+        for _,handName in pairs({"CatchLeft","CatchRight"}) do
+            if (handName=="CatchLeft" and settings.catchLeft) or (handName=="CatchRight" and settings.catchRight) then
                 local hand = char:FindFirstChild(handName)
                 if hand then
                     pcall(function()
-                        firetouchinterest(ball, hand, 0)
-                        firetouchinterest(ball, hand, 1)
+                        firetouchinterest(ball,hand,0)
+                        firetouchinterest(ball,hand,1)
                     end)
                 end
             end
-            if settings.freezeTech and char.HumanoidRootPart.Anchored == false then
-                char.HumanoidRootPart.Anchored = true
-                task.delay(settings.freezeTime,function()
-                    if char and char:FindFirstChild("HumanoidRootPart") then
-                        char.HumanoidRootPart.Anchored = false
-                    end
-                end)
-            end
+        end
+        if settings.freezeTech and not root.Anchored then
+            root.Anchored=true
+            task.delay(settings.freezeTime,function()
+                if root then root.Anchored=false end
+            end)
         end
     end
 end)
 
--- Ball ESP + Box Ball + Path Visualizer
+-- Visuals: Ball ESP, Path, Massive Green Halo
+local beam = Instance.new("Beam")
+local att0 = Instance.new("Attachment")
+local att1 = Instance.new("Attachment")
+beam.Attachment0 = att0
+beam.Attachment1 = att1
+beam.Color = ColorSequence.new(Color3.fromRGB(0,255,255))
+beam.Width0 = 0.2
+beam.Width1 = 0.2
+beam.FaceCamera=true
+beam.LightEmission=1
+beam.Parent = workspace
+att0.Parent = workspace
+att1.Parent = workspace
+
+local halo = nil
+
 RunService.RenderStepped:Connect(function()
-    local ball = workspace:FindFirstChild("Football")
-    if not ball then return end
-
-    -- ESP
-    if settings.esp and not ball:FindFirstChild("Highlight") then
-        local h = Instance.new("Highlight",ball)
-        h.FillColor = Color3.fromRGB(255,255,0)
-        h.OutlineColor = Color3.fromRGB(255,0,0)
-        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    end
-
-    -- Box Ball
-    if settings.boxBall then
-        local box = ball:FindFirstChild("BoxBall")
-        if not box then
-            box = Instance.new("BoxHandleAdornment")
-            box.Name = "BoxBall"
-            box.Adornee = ball
-            box.Color3 = Color3.fromRGB(0,255,0)
-            box.AlwaysOnTop = true
-            box.ZIndex = 10
-            box.Parent = ball
-        end
-        box.Size = Vector3.new(settings.boxBallSize,settings.boxBallSize,settings.boxBallSize)
-    else
-        if ball:FindFirstChild("BoxBall") then ball.BoxBall:Destroy() end
-    end
-
-    -- Path Visualizer
     local char = player.Character
-    if settings.path and char and char:FindFirstChild("HumanoidRootPart") then
-        if not ball:FindFirstChild("BallPathLine") then
-            local line = Instance.new("Part")
-            line.Name = "BallPathLine"
-            line.Anchored = true
-            line.CanCollide = false
-            line.Transparency = 0.5
-            line.Material = Enum.Material.Neon
-            line.Color = Color3.fromRGB(0,255,255)
-            line.Size = Vector3.new(0.2,0.2,(ball.Position-char.HumanoidRootPart.Position).Magnitude)
-            line.Parent = workspace
+    local ball = workspace:FindFirstChild("Football")
+    if ball and settings.esp then
+        if not ball:FindFirstChild("Highlight") then
+            local h=Instance.new("Highlight",ball)
+            h.FillColor=Color3.fromRGB(255,255,0)
+            h.OutlineColor=Color3.fromRGB(255,0,0)
+            h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
         end
-        local line = workspace:FindFirstChild("BallPathLine")
-        line.Size = Vector3.new(0.2,0.2,(ball.Position-char.HumanoidRootPart.Position).Magnitude)
-        line.CFrame = CFrame.new(ball.Position,char.HumanoidRootPart.Position)*CFrame.new(0,0,-line.Size.Z/2)
-    else
-        if workspace:FindFirstChild("BallPathLine") then workspace.BallPathLine.Transparency = 1 end
+    end
+    if ball and char and char:FindFirstChild("HumanoidRootPart") then
+        -- Ball path
+        if settings.path then
+            att0.WorldPosition=ball.Position
+            att1.WorldPosition=char.HumanoidRootPart.Position
+            beam.Transparency=NumberSequence.new(0)
+        else
+            beam.Transparency=NumberSequence.new(1)
+        end
+
+        -- Massive Green Halo visual
+        if settings.greenHalo then
+            if not halo then
+                halo = Instance.new("Part")
+                halo.Name = "MassiveGreenHalo"
+                halo.Anchored = true
+                halo.CanCollide = false
+                halo.Material = Enum.Material.Neon
+                halo.Color = Color3.fromRGB(0,255,0)
+                halo.Shape = Enum.PartType.Ball
+                halo.Size = Vector3.new(20,20,20) -- MASSIVE halo
+                halo.Parent = workspace
+            end
+            halo.CFrame = CFrame.new(ball.Position)
+            halo.Transparency = 0.6
+        elseif halo then
+            halo.Transparency = 1
+        end
     end
 end)
 
-print("Star Hub Loaded - Catching Pages 1 & 2 Added")
+-- GUI toggle
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==Enum.KeyCode.B then
+        frame.Visible = not frame.Visible
+    end
+end)
+
+-- Top-right toggle button
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0,100,0,30)
+toggleBtn.Position = UDim2.new(1,-110,0,10)
+toggleBtn.Text = "Toggle Menu"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.Font = Enum.Font.GothamSemibold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = screenGui
+toggleBtn.MouseButton1Click:Connect(function()
+    frame.Visible = not frame.Visible
+end)
+
+print("Star Hub Loaded - Massive Halo + Overpower Magnet")
